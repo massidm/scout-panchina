@@ -548,7 +548,7 @@ const VLABEL = {
 };
 const VCLASS = {'#':'v-k','+':'v-p','-':'v-n','/':'v-b','=':'v-e'};
 const TEAM = 'GARLASCO';
-const APP_VERSION = '1.0 · 19/10/2026';
+const APP_VERSION = '1.1 · 19/10/2026';
 
 const DEFAULT_ROSTER = [
   [15,'Giulio De Benedittis','P'],[6,'Francesco Tarditi','P'],[28,'Francesco Tuis','O'],
@@ -603,6 +603,9 @@ if(!DB || !Array.isArray(DB.roster)){
   save();
 }
 DB.prefs = DB.prefs || {flip:false};
+if(!DB.prefs.theme) DB.prefs.theme='light';
+function applyTheme(){ const t=DB.prefs.theme; const r=document.documentElement; if(t==='auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme',t); }
+applyTheme();
 
 let ui = {tab:'partita', sel:null, skill:null, modal:null, scope:'cur', form:null, editId:null, delId:null, sub:{out:'',in:''}, confirmDel:null, newOpp:'', newDate:today(), io:''};
 let ST = null;
@@ -840,6 +843,9 @@ function viewGestione(){
           <button class="btn primary" data-a="newm">Crea e apri</button>
         </div>
       </section>
+      <section class="panel"><h2>Aspetto</h2>
+        <div class="seg" role="group" aria-label="Tema">${[['light','Chiaro'],['dark','Scuro'],['auto','Come l’iPad']].map(([k,l])=>`<button data-a="theme" data-v="${k}" aria-pressed="${DB.prefs.theme===k}">${l}</button>`).join('')}</div>
+      </section>
       <section class="panel"><h2>Partite</h2>${mlist||'<p class="note">Nessuna partita.</p>'}</section>
       <section class="panel"><h2>Esporta e importa</h2>
         <p class="note">Esporta a fine set come copia di sicurezza. Il file JSON contiene tutti gli eventi della partita aperta e si può reimportare; il CSV si apre in Excel.</p>
@@ -971,6 +977,7 @@ function act(a,d,el,e){
     case 'pt': addEvent({t:'point',w:d.w}); ui.sel=null; ui.skill=null; toast(d.w==='us'?'Punto noi':'Punto loro'); break;
     case 'undo': { if(!m.events.length) return; const ev=m.events.pop(); save(); recompute(); ui.sel=null; ui.skill=null; toast('Annullato: '+evText(ev)); break; }
     case 'flip': DB.prefs.flip=!DB.prefs.flip; save(); break;
+    case 'theme': DB.prefs.theme=d.v; save(); applyTheme(); break;
     case 'm': ui.modal=d.v; ui.editId=null; ui.delId=null; if(d.v==='form') openForm(); if(d.v==='sub') ui.sub={out:'',in:''}; break;
     case 'close': ui.modal=null; break;
     case 'close-ov': if(e && e.target===el) ui.modal=null; else return; break;
