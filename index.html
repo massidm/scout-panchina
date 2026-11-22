@@ -83,6 +83,11 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 @media (max-aspect-ratio:1/1){ .work{grid-template-columns:1fr;grid-template-rows:auto 1fr} }
 .courtwrap{display:flex;flex-direction:column;background:var(--court);border-radius:var(--r);padding:10px;gap:8px;min-height:0}
 .courtwrap.flip{flex-direction:column-reverse}
+.courthead{display:flex;align-items:baseline;gap:8px;padding-inline:2px}
+.courthead b{font-family:var(--f-display);font-weight:700;font-size:24px;color:var(--accent);line-height:1}
+.courthead span{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.rotrow{gap:6px}
+.rotrow .seg button{padding:8px 10px}
 .net{height:10px;border-radius:3px;background:repeating-linear-gradient(90deg,var(--net) 0 2px,transparent 2px 9px),linear-gradient(var(--net),var(--net)) top/100% 2px no-repeat;opacity:.85;position:relative}
 .net span{position:absolute;right:6px;top:-15px;font-size:10px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
 .court{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:8px;flex:1;min-height:0}
@@ -300,6 +305,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .courtwrap{padding:5px;gap:4px}
   .net{height:6px}
   .net span{display:none}
+  .courthead b{font-size:16px}
+  .courthead span{font-size:10px}
   .court{gap:5px}
   .tile{min-height:0;padding:2px;border-width:2px;border-radius:9px}
   .tile .num{font-size:28px}
@@ -399,7 +406,7 @@ const GS = (function () {
           no: st.sets.length + 1, base: ev.lineup.slice(), libero: ev.libero || null,
           libSlots: (ev.libSlots || []).slice(), setterSlot: ev.setterSlot == null ? null : ev.setterSlot,
           k: 0, serve: ev.serve, firstServe: ev.serve, us: 0, them: 0, over: false, winner: null,
-          start: ev.lineup.slice(), startId: ev.id,
+          start: ev.lineup.slice(), startId: ev.id, p1inv: !!ev.p1inv,
           played: new Set(ev.lineup.concat(ev.libero ? [ev.libero] : []))
         };
         st.sets.push(set); st.set = set; startRally(st);
@@ -441,6 +448,11 @@ const GS = (function () {
       case 'libero': {
         if (!s || s.over) return bad();
         s.libero = ev.in; if (ev.in) s.played.add(ev.in);
+        return;
+      }
+      case 'opt': {
+        if (!s) return bad();
+        if (ev.p1inv != null) s.p1inv = !!ev.p1inv;
         return;
       }
       case 'fix': {
@@ -527,7 +539,33 @@ const GS = (function () {
     return { players, team, rot, tot, oppErr, oppPts, rallies: ralliesT };
   }
 
-  return { POINT, VALUES, zoneOf, slotAt, onCourt, replay, expected, stats, target };
+  // Ruoli di sistema dal tagliando: dal palleggiatore in avanti P, S1, C2, O, S2, C1
+  const SYS = ['P', 'S1', 'C2', 'O', 'S2', 'C1'];
+  function roleOfSlot(set, slot) { return set.setterSlot == null ? null : SYS[((slot - set.setterSlot) % 6 + 6) % 6]; }
+
+  // Posti di gioco per ruolo (indice = posto-1), uguali per tutta l'azione.
+  // Davanti 4-3-2: S – C – P/O. Dietro 5-6-1: L (o C che batte) – S – P/O.
+  // P1 in ricezione, non invertita: davanti O – C – S.
+  function layout(st) {
+    const s = st && st.set;
+    if (!s || s.setterSlot == null || !st.rally) return null;
+    const oc = onCourt(s);
+    const recP1 = st.rally.serve === 'them' && st.rally.rot === 1 && !s.p1inv;
+    const out = new Array(6);
+    for (const o of oc) {
+      const role = o.lib ? 'L' : roleOfSlot(s, o.slot);
+      const f = role[0];                       // P, O, S, C, L
+      const front = o.zone >= 2 && o.zone <= 4;
+      let posto;
+      if (front) posto = f === 'S' ? (recP1 ? 2 : 4) : f === 'C' ? 3 : (recP1 ? 4 : 2);
+      else posto = (f === 'L' || f === 'C') ? 5 : f === 'S' ? 6 : 1;
+      if (out[posto - 1]) return null;         // formazione fuori schema: si torna alle zone
+      out[posto - 1] = Object.assign({}, o, { role, posto });
+    }
+    return out;
+  }
+
+  return { POINT, VALUES, zoneOf, slotAt, onCourt, replay, expected, stats, target, layout, roleOfSlot };
 })();
 if (typeof module !== 'undefined') module.exports = GS;
 
@@ -548,7 +586,7 @@ const VLABEL = {
 };
 const VCLASS = {'#':'v-k','+':'v-p','-':'v-n','/':'v-b','=':'v-e'};
 const TEAM = 'GARLASCO';
-const APP_VERSION = '1.1 · 19/10/2026';
+const APP_VERSION = '1.2 · 22/11/2026';
 
 const DEFAULT_ROSTER = [
   [15,'Giulio De Benedittis','P'],[6,'Francesco Tarditi','P'],[28,'Francesco Tuis','O'],
@@ -604,6 +642,7 @@ if(!DB || !Array.isArray(DB.roster)){
 }
 DB.prefs = DB.prefs || {flip:false};
 if(!DB.prefs.theme) DB.prefs.theme='light';
+if(!DB.prefs.layout) DB.prefs.layout='ruolo';
 function applyTheme(){ const t=DB.prefs.theme; const r=document.documentElement; if(t==='auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme',t); }
 applyTheme();
 
@@ -626,6 +665,7 @@ function evText(ev){
     case 'libero': return 'Libero in campo: '+label(ev.in);
     case 'fix': { const p=[]; if(ev.dUs) p.push('noi '+sgn(ev.dUs)); if(ev.dThem) p.push('loro '+sgn(ev.dThem)); if(ev.dk) p.push('rotazione '+sgn(ev.dk)); if(ev.serve) p.push('batte '+(ev.serve==='us'?'noi':'loro')); return 'Correzione: '+p.join(', '); }
     case 'setStart': return 'Inizio set';
+    case 'opt': return 'P1 in ricezione: '+(ev.p1inv?'invertita':'O–C–S');
   }
   return ev.t;
 }
@@ -670,14 +710,15 @@ function viewPartita(){
   const flip=DB.prefs.flip;
   let court='';
   if(s){
-    const oc=GS.onCourt(s);
+    const lay = DB.prefs.layout==='zona' ? null : GS.layout(ST);
+    const oc = lay || GS.onCourt(s);
     const setStats=GS.stats(ST, s.no).players;
     const order = flip? [1,6,5,2,3,4] : [4,3,2,5,6,1];
     court = order.map(z=>{
       const o=oc[z-1]; const p=P(o.id); const vp=(setStats[o.id]||{vp:0}).vp;
-      const isSrv = !s.over && ST.rally.serve==='us' && z===1;
+      const isSrv = !s.over && ST.rally.serve==='us' && !o.lib && o.id===ST.rally.server;
       return `<button class="tile ${o.lib?'lib':''} ${ui.sel===o.id?'sel':''}" data-a="selp" data-id="${o.id}" aria-label="${esc(p.num+' '+p.short)}">
-        <span class="z">Z${z}</span>${isSrv?'<span class="srvtag"><span class="ball"></span>BATTE</span>':''}
+        <span class="z">${lay? esc(o.role) : 'Z'+z}</span>${isSrv?'<span class="srvtag"><span class="ball"></span>BATTE</span>':''}
         <span class="num">${esc(p.num)}</span><span class="nm">${esc(p.short)}</span>
         <span class="meta"><span class="role">${esc(p.role||'')}</span><span class="vp ${vcls(vp)}">${sgn(vp)}</span></span>
       </button>`;
@@ -689,6 +730,7 @@ function viewPartita(){
     <section class="work">
       <div class="courtwrap ${flip?'flip':''}">
         <div class="net"><span>rete</span></div>
+        ${s && !s.over && ST.rally.rot ? `<div class="courthead"><b>P${ST.rally.rot}</b><span>${ST.rally.serve==='us'?'Battuta':'Ricezione'}${ST.rally.rot===1&&ST.rally.serve==='them'?(s.p1inv?' · invertita':' · O–C–S'):''}</span></div>` : ''}
         <div class="court">${court || `<div style="grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;color:var(--muted)">La formazione compare qui</div>`}</div>
       </div>
       ${pad()}
@@ -845,6 +887,9 @@ function viewGestione(){
       </section>
       <section class="panel"><h2>Aspetto</h2>
         <div class="seg" role="group" aria-label="Tema">${[['light','Chiaro'],['dark','Scuro'],['auto','Come l’iPad']].map(([k,l])=>`<button data-a="theme" data-v="${k}" aria-pressed="${DB.prefs.theme===k}">${l}</button>`).join('')}</div>
+        <p class="note" style="margin:10px 0 6px">Giocatori in campo</p>
+        <div class="seg" role="group" aria-label="Disposizione">${[['ruolo','Al posto di gioco'],['zona','Per zona']].map(([k,l])=>`<button data-a="layout" data-v="${k}" aria-pressed="${DB.prefs.layout===k}">${l}</button>`).join('')}</div>
+        <p class="note" style="margin:6px 0 0">Al posto di gioco: davanti S–C–P/O, dietro L–S–P/O; in P1 quando riceviamo davanti O–C–S (o invertita).</p>
       </section>
       <section class="panel"><h2>Partite</h2>${mlist||'<p class="note">Nessuna partita.</p>'}</section>
       <section class="panel"><h2>Esporta e importa</h2>
@@ -893,12 +938,17 @@ function modalForm(){
   if(ids.length===6 && nP===0) warns.push('Nessun palleggiatore: le rotazioni P1–P6 non saranno calcolate.');
   if(ids.length===6 && f.lib && nC===0) warns.push('Nessun centrale: il libero non entrerà in automatico.');
   const ok=ids.length===6 && !dup && f.serve;
+  const sIdx=f.z.findIndex(id=>id&&P(id).role==='P'); const curP = sIdx>=0? sIdx+1 : 0;
   if(editing) warns.unshift('Stai cambiando la formazione di partenza di un set già iniziato: punteggio, rotazioni e statistiche vengono ricalcolati. Usalo solo se la formazione inserita era sbagliata; per le sostituzioni usa “Cambio”.');
   return `<h2>${editing?'Modifica formazione':'Formazione'} ${no}° set</h2>
     <p class="note" style="margin:0">Posizioni di partenza viste da dietro il nostro campo, rete in alto.${!editing&&no>1?' Precompilata con la formazione del set precedente.':''}</p>
+    <div class="row rotrow"><span class="note">Rotazione</span>
+      <div class="seg" role="group" aria-label="Rotazione di partenza">${[1,2,3,4,5,6].map(k=>`<button data-a="frot" data-v="${k}" aria-pressed="${curP===k}" ${curP?'':'disabled'}>P${k}</button>`).join('')}</div>
+      <button class="btn sm" data-a="fturn" data-v="-1" aria-label="Ruota indietro">↺</button><button class="btn sm" data-a="fturn" data-v="1" aria-label="Ruota avanti">↻ Ruota</button></div>
     <div class="fcourt">${order.map(zoneSel).join('')}</div>
     <div class="row"><label class="field" style="flex:1">Libero<select data-f="lib">${opt(libs,f.lib,'Nessun libero')}</select></label>
-      <div class="field">Batte per primo<div class="seg"><button data-a="fserve" data-v="us" aria-pressed="${f.serve==='us'}">Noi</button><button data-a="fserve" data-v="them" aria-pressed="${f.serve==='them'}">Loro</button></div></div></div>
+      <div class="field">Batte per primo<div class="seg"><button data-a="fserve" data-v="us" aria-pressed="${f.serve==='us'}">Noi</button><button data-a="fserve" data-v="them" aria-pressed="${f.serve==='them'}">Loro</button></div></div>
+      <div class="field">P1 in ricezione<div class="seg"><button data-a="finv" data-v="0" aria-pressed="${!f.p1inv}">O–C–S</button><button data-a="finv" data-v="1" aria-pressed="${!!f.p1inv}">Invertita</button></div></div></div>
     ${warns.map(w=>`<div class="warn">${w}</div>`).join('')}
     <div class="row"><span class="sp"></span><button class="btn" data-a="close">Annulla</button><button class="btn primary" data-a="startset" ${ok?'':'disabled'}>${editing?'Salva formazione':'Inizia set '+no}</button></div>`;
 }
@@ -927,6 +977,7 @@ function modalFix(){
       <div class="fixbox"><span class="note">Rotazione</span><span class="big">${ST.rally.rot?'P'+ST.rally.rot:'–'}</span><div class="row"><button class="btn" data-a="fix" data-k="dk" data-v="-1">Indietro</button><button class="btn" data-a="fix" data-k="dk" data-v="1">Avanti</button></div></div>
       <div class="fixbox"><span class="note">Batte</span><span class="big">${ST.rally.serve==='us'?'Noi':'Loro'}</span><div class="seg"><button data-a="fixserve" data-v="us" aria-pressed="${ST.rally.serve==='us'}">Noi</button><button data-a="fixserve" data-v="them" aria-pressed="${ST.rally.serve==='them'}">Loro</button></div></div>
     </div>
+    <div class="row"><span class="note">P1 in ricezione</span><div class="seg"><button data-a="fixinv" data-v="0" aria-pressed="${!s.p1inv}">O–C–S</button><button data-a="fixinv" data-v="1" aria-pressed="${!!s.p1inv}">Invertita</button></div></div>
     <div class="row"><button class="btn sm" data-a="editform">Modifica formazione del set (emergenza)</button><span class="sp"></span><button class="btn primary" data-a="close">Fatto</button></div>`;
 }
 function modalLog(){
@@ -957,7 +1008,7 @@ function modalLog(){
 function openForm(){
   const m=cur(); const lastStart=[...m.events].reverse().find(e=>e.t==='setStart'&&!ST.ignored.includes(e.id));
   const no=ST.sets.length+1;
-  ui.form = lastStart? {z:lastStart.lineup.slice(), lib:lastStart.libero||'', serve: no===5? '' : (lastStart.serve==='us'?'them':'us')} : {z:['','','','','',''], lib:'', serve:''};
+  ui.form = lastStart? {z:lastStart.lineup.slice(), lib:lastStart.libero||'', serve: no===5? '' : (lastStart.serve==='us'?'them':'us'), p1inv:!!lastStart.p1inv} : {z:['','','','','',''], lib:'', serve:'', p1inv:false};
   ui.modal='form';
 }
 function act(a,d,el,e){
@@ -984,18 +1035,23 @@ function act(a,d,el,e){
     case 'fserve': ui.form.serve=d.v; break;
     case 'editform': {
       const sev=m.events.find(e=>e.id===ST.set.startId); if(!sev) return;
-      ui.form={z:sev.lineup.slice(), lib:sev.libero||'', serve:sev.serve, editId:sev.id}; ui.modal='form'; break; }
+      ui.form={z:sev.lineup.slice(), lib:sev.libero||'', serve:sev.serve, p1inv:!!sev.p1inv, editId:sev.id}; ui.modal='form'; break; }
+    case 'fturn': { const z=ui.form.z, n=+d.v; ui.form.z = z.map((_,i)=>z[((i+n)%6+6)%6]); break; }
+    case 'frot': { const k=+d.v; for(let i=0;i<6;i++){ const si=ui.form.z.findIndex(id=>id&&P(id).role==='P'); if(si<0||si+1===k) break; const z=ui.form.z; ui.form.z=z.map((_,j)=>z[(j+1)%6]); } break; }
+    case 'finv': ui.form.p1inv = d.v==='1'; break;
+    case 'fixinv': addEvent({t:'opt',p1inv:d.v==='1'}); toast(d.v==='1'?'P1 in ricezione: invertita':'P1 in ricezione: O–C–S'); break;
+    case 'layout': DB.prefs.layout=d.v; save(); break;
     case 'startset': {
       const f=ui.form; const libSlots=[]; let setterSlot=null;
       f.z.forEach((id,i)=>{ const r=P(id).role; if(r==='C') libSlots.push(i); if(r==='P' && setterSlot==null) setterSlot=i; });
       if(f.editId){
         const sev=m.events.find(e=>e.id===f.editId); const before=ST.ignored.length;
-        Object.assign(sev,{lineup:f.z.slice(),libero:f.lib||null,serve:f.serve,libSlots:f.lib?libSlots:[],setterSlot});
+        Object.assign(sev,{lineup:f.z.slice(),libero:f.lib||null,serve:f.serve,libSlots:f.lib?libSlots:[],setterSlot,p1inv:!!f.p1inv});
         save(); recompute(); ui.modal=null;
         const nIgn=ST.ignored.length-before;
         toast(nIgn>0? 'Formazione salvata · '+nIgn+' eventi non più validi: controlla il Registro' : 'Formazione salvata');
         break; }
-      addEvent({t:'setStart',lineup:f.z.slice(),libero:f.lib||null,serve:f.serve,libSlots:f.lib?libSlots:[],setterSlot});
+      addEvent({t:'setStart',lineup:f.z.slice(),libero:f.lib||null,serve:f.serve,libSlots:f.lib?libSlots:[],setterSlot,p1inv:!!f.p1inv});
       ui.modal=null; ui.scope='cur'; toast('Set '+ST.set.no+' iniziato'); break; }
     case 'dosub': addEvent({t:'sub',out:ui.sub.out,in:ui.sub.in}); toast('Cambio: entra '+label(ui.sub.in)); ui.modal=null; break;
     case 'dolib': addEvent({t:'libero',in:d.id}); toast('Libero: '+label(d.id)); ui.modal=null; break;
@@ -1078,6 +1134,7 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
 
 recompute(); render();
 })();
+
 </script>
 
 <script>
