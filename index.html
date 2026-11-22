@@ -61,6 +61,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 .tabs{display:flex;gap:4px;background:var(--surface2);padding:3px;border-radius:12px}
 .tabs button{padding:8px 14px;border-radius:9px;font-weight:600;font-size:14px;color:var(--muted);white-space:nowrap}
 .tabs button[aria-current="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tabs a.tablink{padding:8px 14px;border-radius:9px;font-weight:600;font-size:14px;color:var(--accent);white-space:nowrap;text-decoration:none;border-left:1px solid var(--line)}
 .view{min-height:0;overflow:auto;padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
 .view.fixed{overflow:hidden;display:grid;grid-template-rows:auto 1fr auto;gap:8px}
 
@@ -85,6 +86,8 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 .pp{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;display:flex;flex-direction:column;gap:2px}
 .pp.now{border-color:var(--accent);border-width:2px}
 .pp small{color:var(--muted)} .pp-h b{font-size:16px}
+.planlist{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.planitem{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 
 /* area di lavoro */
 .work{display:grid;grid-template-columns:1.2fr 1fr;gap:10px;min-height:0}
@@ -297,7 +300,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 @media (orientation:landscape) and (max-height:500px){
   .brand,.match-name{display:none}
   .top{padding-block:4px 2px;justify-content:center}
-  .tabs button{padding:5px 12px;font-size:13px}
+  .tabs button,.tabs a.tablink{padding:5px 12px;font-size:13px}
   .view.fixed{grid-template-columns:minmax(0,1fr) 150px;grid-template-rows:auto minmax(0,1fr) auto;gap:6px}
   .view.fixed .scorebar{grid-column:1/-1;padding:2px 12px}
   .score{font-size:30px}
@@ -598,7 +601,7 @@ const VLABEL = {
 };
 const VCLASS = {'#':'v-k','+':'v-p','-':'v-n','/':'v-b','=':'v-e'};
 const TEAM = 'GARLASCO';
-const APP_VERSION = '1.3 · 22/11/2026';
+const APP_VERSION = '1.4 · 22/11/2026';
 
 const DEFAULT_ROSTER = [
   [15,'Giulio De Benedittis','P'],[6,'Francesco Tarditi','P'],[28,'Francesco Tuis','O'],
@@ -693,7 +696,7 @@ function render(){
   <header class="top">
     <span class="brand">Scout panchina</span>
     <span class="match-name">${m? esc((m.example?'ESEMPIO · ':'')+TEAM+' – '+m.opp.toUpperCase()+' · '+fmtDate(m.date)) : 'Nessuna partita aperta'}${storageOk?'':' · <b style="color:var(--bad)">salvataggio non disponibile: esporta i dati a fine set</b>'}</span>
-    <nav class="tabs">${tabs.map(([k,l])=>`<button data-a="tab" data-v="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('')}</nav>
+    <nav class="tabs">${tabs.map(([k,l])=>`<button data-a="tab" data-v="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('')}<a class="tablink" href="foglio/">Foglio gara</a></nav>
   </header>
   ${ui.tab==='partita'? viewPartita() : ui.tab==='timeout'? viewTimeout() : ui.tab==='tabellino'? viewTabellino() : viewGestione()}
   ${ui.modal? modal() : ''}`;
@@ -716,6 +719,8 @@ function scorebar(){
 }
 
 /* ---------- piano avversario (dal foglio gara: matchup) ---------- */
+// piani lasciati dal foglio gara su questo dispositivo (stessa app, stessa memoria del browser)
+function localPlans(){ try{ const o=JSON.parse(localStorage.getItem('fogliogara.plans')||'{}'); return Object.values(o).filter(p=>p&&p.rot).sort((a,b)=>String(b.made).localeCompare(String(a.made))); }catch(e){ return []; } }
 const plan = () => { const m=cur(); return m && m.plan && m.plan.rot ? m.plan : null; };
 const planTxt = {
   serve: R => (R.serve||[]).map(x=>`${esc(x.name)} ${esc(x.zone)}${x.type==='spin'?' spin':''} <small>(${x.eff}%)</small>`).join(' · '),
@@ -939,7 +944,8 @@ function viewGestione(){
       <section class="panel"><h2>Partite</h2>${mlist||'<p class="note">Nessuna partita.</p>'}</section>
       <section class="panel"><h2>Piano avversario</h2>
         ${cur()&&cur().plan?`<p class="note" style="margin-top:0">Collegato alla partita aperta: <b>${esc(cur().plan.opp)}</b>${cur().plan.date?' · '+fmtDate(cur().plan.date):''}. In Partita compare, rotazione per rotazione, su chi battere e chi murare; in Timeout le prossime rotazioni.</p><button class="btn sm" data-a="unplan">Togli il piano</button>`
-          :`<p class="note" style="margin-top:0">Dal foglio gara: Matchup → “Piano per lo scout touch”. Poi qui sotto “Importa file” con la partita aperta. A inizio set indica la loro rotazione di partenza.</p>`}
+          :`<p class="note" style="margin-top:0">Dal foglio gara di questo dispositivo: scegli il piano qui sotto (ogni foglio con il Matchup aperto ne lascia uno). Da un altro dispositivo: Matchup → “Piano per lo scout touch”, poi “Importa file” con la partita aperta. A inizio set indica la loro rotazione di partenza.</p>`}
+        ${localPlans().length?`<div class="planlist">${localPlans().map(p=>`<div class="planitem"><span><b>${esc(p.opp||'Avversario')}</b>${p.date?' · '+fmtDate(p.date):''} <small class="note">aggiornato ${esc(String(p.made||'').slice(0,10).split('-').reverse().join('/'))}</small></span>${cur()?`<button class="btn sm" data-a="planlocal" data-v="${esc(p.sheet||'')}">${cur().plan&&cur().plan.sheet===p.sheet?'Ricollega (aggiorna)':'Collega a questa partita'}</button>`:''}</div>`).join('')}</div>`:''}
       </section>
       <section class="panel"><h2>Esporta e importa</h2>
         <p class="note">Esporta a fine set come copia di sicurezza. Il file JSON contiene tutti gli eventi della partita aperta e si può reimportare; il CSV si apre in Excel.</p>
@@ -1091,6 +1097,7 @@ function act(a,d,el,e){
     case 'fserve': ui.form.serve=d.v; if(!ui.form.oppManual) ui.form.opp=planOppStart(d.v); break;
     case 'fopp': ui.form.opp=+d.v; ui.form.oppManual=true; break;
     case 'fixopp': addEvent({t:'fix',oppRot:+d.v}); break;
+    case 'planlocal': { const m2=cur(), p=localPlans().find(x=>x.sheet===d.v); if(m2&&p){ m2.plan=p; save(); toast('Piano '+(p.opp||'avversario')+' collegato a questa partita'); } break; }
     case 'unplan': { const m2=cur(); if(m2){ delete m2.plan; save(); toast('Piano tolto'); } break; }
     case 'editform': {
       const sev=m.events.find(e=>e.id===ST.set.startId); if(!sev) return;

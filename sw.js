@@ -1,12 +1,13 @@
 /* Service worker: l'app funziona senza rete.
-   Pagina: prima prova la rete (max 3 s) per prendere gli aggiornamenti, altrimenti usa la copia salvata.
-   Font e icone: copia salvata. Cambiare VERSION a ogni rilascio. */
-const VERSION = 'scout-v1.3-2026-11-22';
+   Pagine (scout e foglio gara): prima prova la rete (max 3 s) per prendere gli aggiornamenti, altrimenti la copia salvata.
+   Font, icone, librerie del PDF: copia salvata. Cambiare VERSION a ogni rilascio. */
+const VERSION = 'app-v1.4-2026-11-22';
 const CORE = [
   './', 'index.html', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/favicon-32.png',
   'fonts/Barlow-400.woff2', 'fonts/Barlow-500.woff2', 'fonts/Barlow-600.woff2', 'fonts/Barlow-700.woff2',
-  'fonts/BarlowCondensed-500.woff2', 'fonts/BarlowCondensed-600.woff2', 'fonts/BarlowCondensed-700.woff2'
+  'fonts/BarlowCondensed-500.woff2', 'fonts/BarlowCondensed-600.woff2', 'fonts/BarlowCondensed-700.woff2',
+  'foglio/', 'foglio/lib/jspdf.umd.min.js', 'foglio/lib/svg2pdf.umd.min.js'
 ];
 
 self.addEventListener('install', e => {
@@ -30,12 +31,14 @@ self.addEventListener('fetch', e => {
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
       const cache = await caches.open(VERSION);
+      // each page under its own address: the scout (./) and the match sheet (foglio/)
+      const key = new URL(url.pathname.endsWith('/') ? url.pathname : url.pathname.replace(/index\.html$/, ''), url.origin).href;
       try {
         const res = await Promise.race([fetch(req, { cache: 'no-store' }), timeout(3000)]);
-        if (res && res.ok) { cache.put('index.html', res.clone()); return res; }
+        if (res && res.ok) { cache.put(key, res.clone()); return res; }
         throw new Error('bad response');
       } catch (err) {
-        return (await cache.match('index.html')) || (await cache.match('./')) || Response.error();
+        return (await cache.match(key)) || (await cache.match(req, { ignoreSearch: true })) || (await cache.match('./')) || Response.error();
       }
     })());
     return;
