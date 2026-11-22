@@ -9,8 +9,14 @@ Web app per segnare dalla panchina i tocchi della squadra (battuta, ricezione, a
 
 I dati restano solo su quel dispositivo, e l'app installata ha una memoria separata da Safari. Esporta il JSON a fine set o a fine partita ("Rosa e partite → Scarica JSON").
 
+## Foglio gara (dalla v1.4)
+Nella stessa app c'è il foglio gara (`foglio/`): report sugli avversari con PDF, Campionato, Matchup. Dallo scout: "Foglio gara" in alto; dal foglio: "← Scout".
+- Sullo stesso dispositivo lo scout trova da solo i piani del matchup (Rosa e partite → Piano avversario).
+- I fogli stanno nella memoria dell'app: "Esporta tutto" fa una copia completa (fogli, difese base, Campionato) che si reimporta con "Importa".
+- Sorgenti in `foglio/src/`; `python3 foglio/build.py` ricostruisce `foglio/index.html` (librerie PDF locali in `foglio/lib/`, uso senza rete). `python3 foglio/build.py --claude` produce la versione per claude.ai.
+
 ## File
-- `index.html` — l'app (unico file, motore incluso)
+- `index.html` — lo scout (unico file, motore incluso)
 - `sw.js` — copia per l'uso senza rete; cambiare `VERSION` a ogni rilascio
 - `manifest.webmanifest`, `icons/` — icona e nome sulla schermata Home
 - `fonts/` — Barlow e Barlow Condensed (SIL Open Font License)
