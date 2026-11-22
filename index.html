@@ -77,6 +77,14 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 .setinfo{display:flex;flex-direction:column;align-items:center;font-size:12px;color:var(--muted);gap:2px;text-transform:uppercase;letter-spacing:.06em}
 .setinfo b{font-family:var(--f-display);font-size:20px;color:var(--ink);letter-spacing:0}
 .rotchip{font-family:var(--f-display);font-weight:700;font-size:15px;background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px}
+.rotchip.opp{background:var(--surface2);color:var(--ink)}
+.planline{display:flex;flex-direction:column;gap:1px;font-size:13px;line-height:1.3;background:var(--surface);border-radius:8px;padding:5px 8px;border-left:4px solid var(--accent)}
+.planline .pl-h{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.planline small{color:var(--muted)} .pl-n{font-style:italic;color:var(--muted)}
+.ppgrid{display:grid;grid-template-columns:1fr;gap:8px}
+.pp{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;display:flex;flex-direction:column;gap:2px}
+.pp.now{border-color:var(--accent);border-width:2px}
+.pp small{color:var(--muted)} .pp-h b{font-size:16px}
 
 /* area di lavoro */
 .work{display:grid;grid-template-columns:1.2fr 1fr;gap:10px;min-height:0}
@@ -372,6 +380,8 @@ const GS = (function () {
     st.rally = {
       serve: s.serve, k: s.k,
       rot: s.setterSlot == null ? null : zoneOf(s.setterSlot, s.k),
+      // rotazione avversaria (posizione del loro palleggiatore), se data a inizio set: cambia quando fanno cambio palla
+      opp: s.oppRot ? ((s.oppRot - 1 - s.ok) % 6 + 6) % 6 + 1 : null,
       server: s.serve === 'us' ? s.base[slotAt(1, s.k)] : null,
       n: 0, attacks: 0, rec: null
     };
@@ -389,9 +399,9 @@ const GS = (function () {
 
   function endRally(st, w, how) {
     const s = st.set, r = st.rally;
-    st.rallies.push({ set: s.no, serve: r.serve, rot: r.rot, server: r.server, winner: w, how, n: r.n });
+    st.rallies.push({ set: s.no, serve: r.serve, rot: r.rot, opp: r.opp, server: r.server, winner: w, how, n: r.n });
     if (w === 'us') s.us++; else s.them++;
-    if (w !== s.serve) { if (w === 'us') s.k++; s.serve = w; }
+    if (w !== s.serve) { if (w === 'us') s.k++; else s.ok++; s.serve = w; }
     checkSetEnd(st);
     startRally(st);
   }
@@ -406,7 +416,7 @@ const GS = (function () {
           no: st.sets.length + 1, base: ev.lineup.slice(), libero: ev.libero || null,
           libSlots: (ev.libSlots || []).slice(), setterSlot: ev.setterSlot == null ? null : ev.setterSlot,
           k: 0, serve: ev.serve, firstServe: ev.serve, us: 0, them: 0, over: false, winner: null,
-          start: ev.lineup.slice(), startId: ev.id, p1inv: !!ev.p1inv,
+          start: ev.lineup.slice(), startId: ev.id, p1inv: !!ev.p1inv, oppRot: ev.oppRot || null, ok: 0,
           played: new Set(ev.lineup.concat(ev.libero ? [ev.libero] : []))
         };
         st.sets.push(set); st.set = set; startRally(st);
@@ -460,6 +470,8 @@ const GS = (function () {
         s.us = Math.max(0, s.us + (ev.dUs || 0));
         s.them = Math.max(0, s.them + (ev.dThem || 0));
         if (ev.dk) s.k += ev.dk;
+        if (ev.dok) s.ok += ev.dok;
+        if (ev.oppRot) { s.oppRot = ev.oppRot; s.ok = 0; }
         if (ev.serve) s.serve = ev.serve;
         checkSetEnd(st); startRally(st);
         return;
@@ -586,7 +598,7 @@ const VLABEL = {
 };
 const VCLASS = {'#':'v-k','+':'v-p','-':'v-n','/':'v-b','=':'v-e'};
 const TEAM = 'GARLASCO';
-const APP_VERSION = '1.2 · 22/11/2026';
+const APP_VERSION = '1.3 · 22/11/2026';
 
 const DEFAULT_ROSTER = [
   [15,'Giulio De Benedittis','P'],[6,'Francesco Tarditi','P'],[28,'Francesco Tuis','O'],
@@ -699,8 +711,39 @@ function scorebar(){
       <span class="setinfo"><span>Set ${s?s.no:'–'}</span><b>${ST?ST.setsUs:0}–${ST?ST.setsThem:0}</b><span>set vinti</span></span>
       <span class="score">${s?s.them:0}</span>
     </div>
-    <div class="team them"><span class="tname">${esc(m?m.opp:'')}</span><span class="ball ${serveThem?'on':''}"></span></div>
+    <div class="team them">${s&&!s.over&&ST.rally.opp?`<span class="rotchip opp">P${ST.rally.opp}</span>`:''}<span class="tname">${esc(m?m.opp:'')}</span><span class="ball ${serveThem?'on':''}"></span></div>
   </div>`;
+}
+
+/* ---------- piano avversario (dal foglio gara: matchup) ---------- */
+const plan = () => { const m=cur(); return m && m.plan && m.plan.rot ? m.plan : null; };
+const planTxt = {
+  serve: R => (R.serve||[]).map(x=>`${esc(x.name)} ${esc(x.zone)}${x.type==='spin'?' spin':''} <small>(${x.eff}%)</small>`).join(' · '),
+  block: R => (R.attack||[]).filter(a=>a.front).map(a=>`${esc(a.name)} ${a.share}%${a.calls&&a.calls.length?` <small>${esc(a.calls.join(', '))}</small>`:''}`).join(' · '),
+  back: R => (R.attack||[]).filter(a=>!a.front&&a.share>=15).map(a=>`${esc(a.name)} ${a.share}%`).join(' · ')
+};
+function planLine(){
+  const pl=plan(), s=ST&&ST.set; if(!pl||!s||s.over) return '';
+  const opp=ST.rally.opp;
+  if(!opp) return `<div class="planline"><span class="pl-h">Piano ${esc(pl.opp)}</span><span>Manca la loro rotazione: indicala in “Correggi”.</span></div>`;
+  const R=pl.rot['P'+opp]; if(!R) return '';
+  const srv=ST.rally.serve==='us';
+  return `<div class="planline"><span class="pl-h">Loro P${opp}${R.cp!=null?` · CP ${R.cp}%`:''}</span>
+    ${srv&&R.serve&&R.serve.length?`<span><b>Batti</b> ${planTxt.serve(R)}</span>`:''}
+    <span><b>Muro</b> ${planTxt.block(R)||'—'}${planTxt.back(R)?` · <i>dietro</i> ${planTxt.back(R)}`:''}</span>
+    ${R.note?`<span class="pl-n">${esc(R.note)}</span>`:''}</div>`;
+}
+function planPanel(){
+  const pl=plan(); if(!pl) return '';
+  const s=ST&&ST.set, opp=s&&!s.over&&ST.rally.opp;
+  const order=opp? [0,1,2].map(i=>((opp-1-i)%6+6)%6+1) : [1,6,5,4,3,2];
+  const card=P=>{ const R=pl.rot['P'+P]; if(!R) return ''; return `<div class="pp ${P===opp?'now':''}"><div class="pp-h"><b>P${P}</b>${P===opp?' <span class="cur-tag">ORA</span>':''}${R.cp!=null?` <small>cambio palla ${R.cp}%</small>`:''}</div>
+    <div><small>Davanti</small> ${esc((R.front||[]).join(' · '))}</div>
+    <div><small>Batti su</small> ${planTxt.serve(R)||'—'}</div>
+    <div><small>Attaccano</small> ${(R.attack||[]).map(a=>`${esc(a.name)} ${a.share}%${a.eff!=null?` <small>eff ${a.eff}%</small>`:''}${a.front?'':' <small>(dietro)</small>'}${a.calls&&a.calls.length?` <small>${esc(a.calls.join(', '))}</small>`:''}`).join(' · ')||'—'}</div>
+    ${R.note?`<div class="pl-n">${esc(R.note)}</div>`:''}</div>`; };
+  return `<section class="panel"><h2>Piano ${esc(pl.opp)}</h2>${opp?'':'<p class="note" style="margin-top:0">Rotazione avversaria non indicata: tutte le rotazioni.</p>'}<div class="ppgrid">${order.map(card).join('')}</div>
+    <p class="note" style="margin:8px 0 0">Dal foglio gara (matchup${pl.date?' · '+fmtDate(pl.date):''}). Tendenze dagli scout, da verificare in campo.</p></section>`;
 }
 
 function viewPartita(){
@@ -732,6 +775,7 @@ function viewPartita(){
         <div class="net"><span>rete</span></div>
         ${s && !s.over && ST.rally.rot ? `<div class="courthead"><b>P${ST.rally.rot}</b><span>${ST.rally.serve==='us'?'Battuta':'Ricezione'}${ST.rally.rot===1&&ST.rally.serve==='them'?(s.p1inv?' · invertita':' · O–C–S'):''}</span></div>` : ''}
         <div class="court">${court || `<div style="grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;color:var(--muted)">La formazione compare qui</div>`}</div>
+        ${planLine()}
       </div>
       ${pad()}
     </section>
@@ -806,6 +850,7 @@ function viewTimeout(){
         <p class="note" style="margin:8px 0 0">V−P: punti fatti (ace, attacchi vincenti, muri) meno errori. Err: errori in battuta, ricezione, attacco, generici e attacchi murati. Eff attacco: (punti − errori − murati) / attacchi. Ricezione positiva: # e +.</p>
       </section>
       <div class="stack">
+        ${planPanel()}
         <section class="panel"><h2>Squadra</h2><div class="kpis">
           <div class="kpi half"><div class="l">Cambio palla</div><div class="v">${ratio(T.R.t,T.cp)}</div><div class="s">ogni ${ratio(T.R.t,T.cp)} ricezioni 1 punto<br>${T.R.t} ricezioni · ${T.cp} punti CP</div></div>
           <div class="kpi half"><div class="l">Break point</div><div class="v">${ratio(T.B.t,T.bp)}</div><div class="s">ogni ${ratio(T.B.t,T.bp)} battute 1 break point<br>${T.B.t} battute · ${T.bp} punti BP</div></div>
@@ -892,6 +937,10 @@ function viewGestione(){
         <p class="note" style="margin:6px 0 0">Al posto di gioco: davanti S–C–P/O, dietro L–S–P/O; in P1 quando riceviamo davanti O–C–S (o invertita).</p>
       </section>
       <section class="panel"><h2>Partite</h2>${mlist||'<p class="note">Nessuna partita.</p>'}</section>
+      <section class="panel"><h2>Piano avversario</h2>
+        ${cur()&&cur().plan?`<p class="note" style="margin-top:0">Collegato alla partita aperta: <b>${esc(cur().plan.opp)}</b>${cur().plan.date?' · '+fmtDate(cur().plan.date):''}. In Partita compare, rotazione per rotazione, su chi battere e chi murare; in Timeout le prossime rotazioni.</p><button class="btn sm" data-a="unplan">Togli il piano</button>`
+          :`<p class="note" style="margin-top:0">Dal foglio gara: Matchup → “Piano per lo scout touch”. Poi qui sotto “Importa file” con la partita aperta. A inizio set indica la loro rotazione di partenza.</p>`}
+      </section>
       <section class="panel"><h2>Esporta e importa</h2>
         <p class="note">Esporta a fine set come copia di sicurezza. Il file JSON contiene tutti gli eventi della partita aperta e si può reimportare; il CSV si apre in Excel.</p>
         <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -949,6 +998,9 @@ function modalForm(){
     <div class="row"><label class="field" style="flex:1">Libero<select data-f="lib">${opt(libs,f.lib,'Nessun libero')}</select></label>
       <div class="field">Batte per primo<div class="seg"><button data-a="fserve" data-v="us" aria-pressed="${f.serve==='us'}">Noi</button><button data-a="fserve" data-v="them" aria-pressed="${f.serve==='them'}">Loro</button></div></div>
       <div class="field">P1 in ricezione<div class="seg"><button data-a="finv" data-v="0" aria-pressed="${!f.p1inv}">O–C–S</button><button data-a="finv" data-v="1" aria-pressed="${!!f.p1inv}">Invertita</button></div></div></div>
+    <div class="row rotrow"><span class="note">Loro partono in</span>
+      <div class="seg" role="group" aria-label="Rotazione di partenza avversaria">${[1,2,3,4,5,6].map(k=>`<button data-a="fopp" data-v="${k}" aria-pressed="${f.opp===k}">P${k}</button>`).join('')}<button data-a="fopp" data-v="0" aria-pressed="${!f.opp}">?</button></div>
+      ${plan()?`<span class="note">Matchup: noi <b>${esc(plan().ours.srvStart)}</b> se battiamo, <b>${esc(plan().ours.recStart)}</b> se riceviamo · loro di solito ${esc(plan().theyRec)} in ricezione, ${esc(plan().theySrv)} in battuta</span>`:'<span class="note">Serve per i suggerimenti del piano avversario.</span>'}</div>
     ${warns.map(w=>`<div class="warn">${w}</div>`).join('')}
     <div class="row"><span class="sp"></span><button class="btn" data-a="close">Annulla</button><button class="btn primary" data-a="startset" ${ok?'':'disabled'}>${editing?'Salva formazione':'Inizia set '+no}</button></div>`;
 }
@@ -975,6 +1027,7 @@ function modalFix(){
       <div class="fixbox"><span class="note">${TEAM}</span><span class="big">${s.us}</span><div class="row"><button class="btn" data-a="fix" data-k="dUs" data-v="-1">−1</button><button class="btn" data-a="fix" data-k="dUs" data-v="1">+1</button></div></div>
       <div class="fixbox"><span class="note">${esc(cur().opp)}</span><span class="big">${s.them}</span><div class="row"><button class="btn" data-a="fix" data-k="dThem" data-v="-1">−1</button><button class="btn" data-a="fix" data-k="dThem" data-v="1">+1</button></div></div>
       <div class="fixbox"><span class="note">Rotazione</span><span class="big">${ST.rally.rot?'P'+ST.rally.rot:'–'}</span><div class="row"><button class="btn" data-a="fix" data-k="dk" data-v="-1">Indietro</button><button class="btn" data-a="fix" data-k="dk" data-v="1">Avanti</button></div></div>
+      <div class="fixbox"><span class="note">Loro rotazione</span><span class="big">${ST.rally.opp?'P'+ST.rally.opp:'–'}</span>${ST.rally.opp?`<div class="row"><button class="btn" data-a="fix" data-k="dok" data-v="-1">Indietro</button><button class="btn" data-a="fix" data-k="dok" data-v="1">Avanti</button></div>`:`<div class="seg">${[1,2,3,4,5,6].map(k=>`<button data-a="fixopp" data-v="${k}">P${k}</button>`).join('')}</div>`}</div>
       <div class="fixbox"><span class="note">Batte</span><span class="big">${ST.rally.serve==='us'?'Noi':'Loro'}</span><div class="seg"><button data-a="fixserve" data-v="us" aria-pressed="${ST.rally.serve==='us'}">Noi</button><button data-a="fixserve" data-v="them" aria-pressed="${ST.rally.serve==='them'}">Loro</button></div></div>
     </div>
     <div class="row"><span class="note">P1 in ricezione</span><div class="seg"><button data-a="fixinv" data-v="0" aria-pressed="${!s.p1inv}">O–C–S</button><button data-a="fixinv" data-v="1" aria-pressed="${!!s.p1inv}">Invertita</button></div></div>
@@ -1005,10 +1058,13 @@ function modalLog(){
 }
 
 /* ---------- azioni ---------- */
+// loro rotazione di partenza dal piano: quando battiamo noi loro ricevono (theyRec), e viceversa
+function planOppStart(serve){ const pl=plan(); if(!pl||!serve) return 0; const P=serve==='us'? pl.theyRec : pl.theySrv; return +String(P||'').replace('P','')||0; }
 function openForm(){
   const m=cur(); const lastStart=[...m.events].reverse().find(e=>e.t==='setStart'&&!ST.ignored.includes(e.id));
   const no=ST.sets.length+1;
   ui.form = lastStart? {z:lastStart.lineup.slice(), lib:lastStart.libero||'', serve: no===5? '' : (lastStart.serve==='us'?'them':'us'), p1inv:!!lastStart.p1inv} : {z:['','','','','',''], lib:'', serve:'', p1inv:false};
+  ui.form.opp = planOppStart(ui.form.serve);
   ui.modal='form';
 }
 function act(a,d,el,e){
@@ -1032,10 +1088,13 @@ function act(a,d,el,e){
     case 'm': ui.modal=d.v; ui.editId=null; ui.delId=null; if(d.v==='form') openForm(); if(d.v==='sub') ui.sub={out:'',in:''}; break;
     case 'close': ui.modal=null; break;
     case 'close-ov': if(e && e.target===el) ui.modal=null; else return; break;
-    case 'fserve': ui.form.serve=d.v; break;
+    case 'fserve': ui.form.serve=d.v; if(!ui.form.oppManual) ui.form.opp=planOppStart(d.v); break;
+    case 'fopp': ui.form.opp=+d.v; ui.form.oppManual=true; break;
+    case 'fixopp': addEvent({t:'fix',oppRot:+d.v}); break;
+    case 'unplan': { const m2=cur(); if(m2){ delete m2.plan; save(); toast('Piano tolto'); } break; }
     case 'editform': {
       const sev=m.events.find(e=>e.id===ST.set.startId); if(!sev) return;
-      ui.form={z:sev.lineup.slice(), lib:sev.libero||'', serve:sev.serve, p1inv:!!sev.p1inv, editId:sev.id}; ui.modal='form'; break; }
+      ui.form={z:sev.lineup.slice(), lib:sev.libero||'', serve:sev.serve, p1inv:!!sev.p1inv, opp:sev.oppRot||0, oppManual:true, editId:sev.id}; ui.modal='form'; break; }
     case 'fturn': { const z=ui.form.z, n=+d.v; ui.form.z = z.map((_,i)=>z[((i+n)%6+6)%6]); break; }
     case 'frot': { const k=+d.v; for(let i=0;i<6;i++){ const si=ui.form.z.findIndex(id=>id&&P(id).role==='P'); if(si<0||si+1===k) break; const z=ui.form.z; ui.form.z=z.map((_,j)=>z[(j+1)%6]); } break; }
     case 'finv': ui.form.p1inv = d.v==='1'; break;
@@ -1046,12 +1105,12 @@ function act(a,d,el,e){
       f.z.forEach((id,i)=>{ const r=P(id).role; if(r==='C') libSlots.push(i); if(r==='P' && setterSlot==null) setterSlot=i; });
       if(f.editId){
         const sev=m.events.find(e=>e.id===f.editId); const before=ST.ignored.length;
-        Object.assign(sev,{lineup:f.z.slice(),libero:f.lib||null,serve:f.serve,libSlots:f.lib?libSlots:[],setterSlot,p1inv:!!f.p1inv});
+        Object.assign(sev,{lineup:f.z.slice(),libero:f.lib||null,serve:f.serve,libSlots:f.lib?libSlots:[],setterSlot,p1inv:!!f.p1inv,oppRot:f.opp||null});
         save(); recompute(); ui.modal=null;
         const nIgn=ST.ignored.length-before;
         toast(nIgn>0? 'Formazione salvata · '+nIgn+' eventi non più validi: controlla il Registro' : 'Formazione salvata');
         break; }
-      addEvent({t:'setStart',lineup:f.z.slice(),libero:f.lib||null,serve:f.serve,libSlots:f.lib?libSlots:[],setterSlot,p1inv:!!f.p1inv});
+      addEvent({t:'setStart',lineup:f.z.slice(),libero:f.lib||null,serve:f.serve,libSlots:f.lib?libSlots:[],setterSlot,p1inv:!!f.p1inv,oppRot:f.opp||null});
       ui.modal=null; ui.scope='cur'; toast('Set '+ST.set.no+' iniziato'); break; }
     case 'dosub': addEvent({t:'sub',out:ui.sub.out,in:ui.sub.in}); toast('Cambio: entra '+label(ui.sub.in)); ui.modal=null; break;
     case 'dolib': addEvent({t:'libero',in:d.id}); toast('Libero: '+label(d.id)); ui.modal=null; break;
@@ -1106,7 +1165,12 @@ function exportFile(kind){
 }
 function importText(txt){
   try{
-    const o=JSON.parse(txt); if(!o||!o.match||!Array.isArray(o.match.events)) throw 0;
+    const o=JSON.parse(txt);
+    if(o&&o.app==='foglio-gara-piano'&&o.rot){
+      const m=cur(); if(!m){ toast('Apri prima la partita, poi importa il piano'); return; }
+      m.plan=o; save(); toast('Piano '+(o.opp||'avversario')+' collegato a questa partita'); ui.io=''; return;
+    }
+    if(!o||!o.match||!Array.isArray(o.match.events)) throw 0;
     (o.roster||[]).forEach(p=>{ if(!DB.roster.some(x=>x.id===p.id)) DB.roster.push(p); });
     const nm=Object.assign({},o.match,{id:uid(),example:false,created:Date.now()}); DB.matches.push(nm); DB.currentId=nm.id; save(); recompute(); ui.io=''; ui.tab='partita'; toast('Partita importata');
   }catch(e){ toast('Il testo non è un export valido'); }
