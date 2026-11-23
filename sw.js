@@ -1,7 +1,7 @@
 /* Service worker: l'app funziona senza rete.
    Pagine (scout e foglio gara): prima prova la rete (max 3 s) per prendere gli aggiornamenti, altrimenti la copia salvata.
    Font, icone, librerie del PDF: copia salvata. Cambiare VERSION a ogni rilascio. */
-const VERSION = 'app-v1.4.1-2026-11-23';
+const VERSION = 'app-v1.4.2-2026-11-23';
 const CORE = [
   './', 'index.html', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/favicon-32.png',

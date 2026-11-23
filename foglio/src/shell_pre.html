@@ -291,10 +291,16 @@ input.needs { border-color: var(--warn) !important; }
   .lgPl td:nth-child(2) { text-align: left; white-space: nowrap; }
   .ptrs { display: flex; flex-wrap: wrap; gap: 14px; text-align: left; padding: 4px 0; } .ptr { display: flex; flex-direction: column; gap: 2px; } .ptr .spark { width: 140px; height: 30px; margin: 0; } .ptr small { color: var(--muted); }
   a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+  #muOv .ovBox { width: min(1440px, 100%); }
+  #muOv .ovHead { gap: 10px; } #muOv .ovHead h2 { margin-right: auto; } #muSheet { max-width: 280px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; }
+  .muLayout { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 1000px) { .muLayout { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; } .muVis { position: sticky; top: 0; } }
+  #muOv .muSix select { font-size: 13px; padding: 6px 4px; } #muOv .muGridT { font-size: 12px; } #muOv .muGridT td.mg1 b { font-size: 15px; }
+  #muOv .mc b { font-size: 16px; } #muOv .mc span { font-size: 10px; } #muOv .muStart > b { font-size: 34px; }
 </style>
 
 <header class="bar">
-  <div class="brand"><i aria-hidden="true"></i>Foglio gara <small style="font-weight:500;opacity:.55;font-size:11px;margin-left:4px">v73</small></div>
+  <div class="brand"><i aria-hidden="true"></i>Foglio gara <small style="font-weight:500;opacity:.55;font-size:11px;margin-left:4px">v74</small></div>
   <select id="sheetSel" aria-label="Apri un foglio"></select>
   <button class="btn small ghost" id="newSheet" type="button">Nuovo</button>
   <button class="btn small ghost" id="dupSheet" type="button" title="Copia note, chiamate e posizioni, per il ritorno">Duplica</button>
@@ -306,6 +312,7 @@ input.needs { border-color: var(--warn) !important; }
   <span class="confirm" id="confirmDel" hidden>Eliminare questo foglio? <button class="btn small" id="delYes" type="button">Sì</button><button class="btn small ghost" id="delNo" type="button">No</button></span>
   <div class="seg" role="group" aria-label="Vista"><button type="button" data-view="edit" aria-pressed="true">Modifica</button><button type="button" data-view="sheet" aria-pressed="false">Foglio</button></div>
   <button class="btn small ghost" id="defBtn" type="button">Difese base</button>
+  <button class="btn small ghost" id="muBtn" type="button">Matchup</button>
   <button class="btn small ghost" id="lgBtn" type="button">Campionato</button>
   <span class="spacer"></span>
   <span id="status" aria-live="polite"></span>
@@ -318,7 +325,6 @@ input.needs { border-color: var(--warn) !important; }
     <details class="sec" open><summary>Partita <small>avversario, data, logo</small></summary><div class="secBody" id="secMatch"></div></details>
     <details class="sec" open><summary>Scout <small>file DataVolley e partite del campionato</small></summary><div class="secBody" id="secScout"></div></details>
     <details class="sec" open><summary>Squadra e rosa <small>ruoli, posti e titolari</small></summary><div class="secBody" id="secTeam"></div></details>
-    <details class="sec"><summary>Matchup <small>come partiamo contro di loro</small></summary><div class="secBody" id="secMu"></div></details>
     <details class="sec"><summary>Video <small>cartella Dropbox e link</small></summary><div class="secBody" id="secVideo"></div></details>
     <details class="sec"><summary>Analisi <small>quello che i report non dicono</small></summary><div class="secBody" id="secAnalysis"></div></details>
     <details class="sec" open><summary>Chiavi <small>e note generali</small></summary><div class="secBody" id="secKeys"></div></details>
@@ -345,6 +351,13 @@ input.needs { border-color: var(--warn) !important; }
     <div class="ovCalls" id="defCalls"></div>
     <div class="ovCourt" id="defCourt"></div>
     <div class="ovFoot"><button class="btn small ghost" id="defReset" type="button">Rimetti le posizioni di partenza</button><span id="defState" class="hint"></span></div>
+  </div>
+</div>
+
+<div id="muOv" class="ov" hidden role="dialog" aria-modal="true" aria-labelledby="muTitle">
+  <div class="ovBox">
+    <div class="ovHead"><h2 id="muTitle">Matchup</h2><select id="muSheet" aria-label="Partita"></select><button class="btn small ghost" id="muClose" type="button">Chiudi</button></div>
+    <div id="secMu"></div>
   </div>
 </div>
 

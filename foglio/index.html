@@ -291,12 +291,18 @@ input.needs { border-color: var(--warn) !important; }
   .lgPl td:nth-child(2) { text-align: left; white-space: nowrap; }
   .ptrs { display: flex; flex-wrap: wrap; gap: 14px; text-align: left; padding: 4px 0; } .ptr { display: flex; flex-direction: column; gap: 2px; } .ptr .spark { width: 140px; height: 30px; margin: 0; } .ptr small { color: var(--muted); }
   a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+  #muOv .ovBox { width: min(1440px, 100%); }
+  #muOv .ovHead { gap: 10px; } #muOv .ovHead h2 { margin-right: auto; } #muSheet { max-width: 280px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; }
+  .muLayout { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 1000px) { .muLayout { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; } .muVis { position: sticky; top: 0; } }
+  #muOv .muSix select { font-size: 13px; padding: 6px 4px; } #muOv .muGridT { font-size: 12px; } #muOv .muGridT td.mg1 b { font-size: 15px; }
+  #muOv .mc b { font-size: 16px; } #muOv .mc span { font-size: 10px; } #muOv .muStart > b { font-size: 34px; }
 .toScout { display: inline-flex; align-items: center; gap: 6px; background: #3E7D14; color: #fff !important; text-decoration: none; font-weight: 800; font-size: 16px; letter-spacing: .04em; padding: 10px 16px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.25); } .toScout:active { transform: translateY(1px); } @media (max-width: 480px) { .toScout { flex-basis: 100%; justify-content: center; } }
 </style>
 
 <header class="bar">
   <a class="toScout" href="../" id="toScout" title="Torna allo scout da panchina"><span aria-hidden="true">◀</span> SCOUT</a>
-  <div class="brand"><i aria-hidden="true"></i>Foglio gara <small style="font-weight:500;opacity:.55;font-size:11px;margin-left:4px">v73</small></div>
+  <div class="brand"><i aria-hidden="true"></i>Foglio gara <small style="font-weight:500;opacity:.55;font-size:11px;margin-left:4px">v74</small></div>
   <select id="sheetSel" aria-label="Apri un foglio"></select>
   <button class="btn small ghost" id="newSheet" type="button">Nuovo</button>
   <button class="btn small ghost" id="dupSheet" type="button" title="Copia note, chiamate e posizioni, per il ritorno">Duplica</button>
@@ -308,6 +314,7 @@ input.needs { border-color: var(--warn) !important; }
   <span class="confirm" id="confirmDel" hidden>Eliminare questo foglio? <button class="btn small" id="delYes" type="button">Sì</button><button class="btn small ghost" id="delNo" type="button">No</button></span>
   <div class="seg" role="group" aria-label="Vista"><button type="button" data-view="edit" aria-pressed="true">Modifica</button><button type="button" data-view="sheet" aria-pressed="false">Foglio</button></div>
   <button class="btn small ghost" id="defBtn" type="button">Difese base</button>
+  <button class="btn small ghost" id="muBtn" type="button">Matchup</button>
   <button class="btn small ghost" id="lgBtn" type="button">Campionato</button>
   <span class="spacer"></span>
   <span id="status" aria-live="polite"></span>
@@ -320,7 +327,6 @@ input.needs { border-color: var(--warn) !important; }
     <details class="sec" open><summary>Partita <small>avversario, data, logo</small></summary><div class="secBody" id="secMatch"></div></details>
     <details class="sec" open><summary>Scout <small>file DataVolley e partite del campionato</small></summary><div class="secBody" id="secScout"></div></details>
     <details class="sec" open><summary>Squadra e rosa <small>ruoli, posti e titolari</small></summary><div class="secBody" id="secTeam"></div></details>
-    <details class="sec"><summary>Matchup <small>come partiamo contro di loro</small></summary><div class="secBody" id="secMu"></div></details>
     <details class="sec"><summary>Video <small>cartella Dropbox e link</small></summary><div class="secBody" id="secVideo"></div></details>
     <details class="sec"><summary>Analisi <small>quello che i report non dicono</small></summary><div class="secBody" id="secAnalysis"></div></details>
     <details class="sec" open><summary>Chiavi <small>e note generali</small></summary><div class="secBody" id="secKeys"></div></details>
@@ -347,6 +353,13 @@ input.needs { border-color: var(--warn) !important; }
     <div class="ovCalls" id="defCalls"></div>
     <div class="ovCourt" id="defCourt"></div>
     <div class="ovFoot"><button class="btn small ghost" id="defReset" type="button">Rimetti le posizioni di partenza</button><span id="defState" class="hint"></span></div>
+  </div>
+</div>
+
+<div id="muOv" class="ov" hidden role="dialog" aria-modal="true" aria-labelledby="muTitle">
+  <div class="ovBox">
+    <div class="ovHead"><h2 id="muTitle">Matchup</h2><select id="muSheet" aria-label="Partita"></select><button class="btn small ghost" id="muClose" type="button">Chiudi</button></div>
+    <div id="secMu"></div>
   </div>
 </div>
 
@@ -4300,6 +4313,14 @@ if (typeof module !== 'undefined') module.exports = SHEET;
   }
   const muName = (sh, n, ours) => { if (!n) return '—'; if (ours) { const p = state.lgCfg?.us?.roster?.[n]; return `${n}-${(p?.surname || '').toUpperCase()}`; } const p = SHEET.player(sh, n); return `${n}-${(p.surname || '').toUpperCase()}`; };
   const MU_RULES = [['blk', 'a muro su'], ['noblk', 'NON a muro su'], ['rec', 'riceve in zona … sulla battuta di'], ['norec', 'NON riceve in zona … sulla battuta di']];
+  // the matchup is its own module (like Campionato): a full screen over the editor, on the sheet chosen at the top
+  function openMatchup() {
+    const sel = $('#muSheet');
+    const list = [...state.sheets].sort((a, b) => (b.updated || 0) - (a.updated || 0));
+    sel.innerHTML = list.map(s => `<option value="${s.id}"${s.id === state.sheet?.id ? ' selected' : ''}>${esc(s.meta?.opp || 'Nuovo foglio')}${s.meta?.date ? ' · ' + esc(s.meta.date.split('-').reverse().join('.')) : ''}</option>`).join('');
+    $('#muOv').hidden = false; renderMatchup(); $('#muClose').focus();
+  }
+  function closeMatchup() { $('#muOv').hidden = true; }
   function renderMatchup() {
     const sh = state.sheet, el = $('#secMu'); if (!el || !sh) return;
     if (!sh.stats) { el.innerHTML = '<p class="hint">Il matchup compare dopo aver caricato gli scout dell’avversario.</p>'; return; }
@@ -4316,7 +4337,13 @@ if (typeof module !== 'undefined') module.exports = SHEET;
     const best = L[0], sel = L.find(x => x.c === mu.pick) || best;
     const ruleTxt = (ru) => `${muName(sh, ru.x, true)} ${ru.t === 'blk' ? 'a muro su' : ru.t === 'noblk' ? 'NON a muro su' : ru.t === 'rec' ? `riceve in ${ru.z} sulla battuta di` : `NON riceve in ${ru.z} sulla battuta di`} ${muName(sh, ru.y)}`;
     const pct = f => Math.round(100 * f) + '%';
-    el.innerHTML = `
+    el.innerHTML = `<div class="muLayout">
+      <div class="muCol muVis">
+      ${muStarts(sh, R, sel)}
+      ${muGridHtml(sh, R, sel)}
+      ${muStepPanel(sh, R, sel)}
+      </div>
+      <div class="muCol muCtl">
       <p class="hint">Le due squadre restano allineate allo stesso modo per tutto il set: gli allineamenti possibili sono 6. Per ognuno conto quanto rispetta le tue richieste, i set vinti stimati e tre indicatori dagli scout (relativi tra i 6 allineamenti, 0-100). Il migliore diventa la partenza in battuta e in ricezione, data la loro partenza probabile.</p>
       <div class="muGrid">
         <div><b>Noi · Garlasco</b> <small class="hint">tagliando dal palleggiatore; di partenza la formazione più usata nelle nostre partite${mu.oursSet ? ' · <button class="link" type="button" id="mu_ours_reset">Torna alla più usata</button>' : ''}</small>${six('o', mu.ours, mu.ourL)}</div>
@@ -4341,11 +4368,8 @@ if (typeof module !== 'undefined') module.exports = SHEET;
         ${L.map((x, i) => `<tr class="${x === sel ? 'us' : ''}" data-mupick="${x.c}"><td>${i === 0 ? '★' : ''}</td><td><b>${x.srvStart}</b></td><td><b>${x.recStart}</b></td><td>${x.rules.length ? pct(x.rf / x.rules.length) : '—'}</td><td>${x.setSrv != null ? `${pct(x.setSrv)} · ${pct(x.setRec)}` : '—'}</td><td>${x.srvN}</td><td>${x.recN}</td><td>${x.blkN}</td><td><b>${x.ind}</b></td></tr>`).join('')}
       </tbody></table></div>
       <p class="hint">★ = suggerito: prima le richieste, poi i set vinti stimati (sotto i 2 punti di differenza contano come pari), poi l’indice. Set vinti stimati: scambio per scambio, il nostro cambio palla (o break point) in quella rotazione contro il loro break point (o cambio palla) in quella loro, nelle partite del girone, con le rotazioni con pochi scambi avvicinate alla media della squadra. È una stima del modello su campioni piccoli, non una previsione: serve a confrontare le partenze. Tocca una riga per vederla sotto.</p>
-      ${muStarts(sh, R, sel)}
-      ${muGridHtml(sh, R, sel)}
-      ${muStepPanel(sh, R, sel)}
       <details class="muMore"><summary>Tabella rotazione per rotazione</summary>${muDetail(sh, R, sel)}</details>
-      <div class="btnRow"><button class="btn small" type="button" id="mu_exp">Piano per lo scout touch (.json)</button><small class="hint">Per ogni loro rotazione: su chi battere, chi attacca e le chiamate di muro del foglio; partenza dall’allineamento scelto (${sel.srvStart} se battiamo, ${sel.recStart} se riceviamo). ${IN_APP ? ' Su questo dispositivo lo scout lo trova già in Rosa e partite → Piano avversario.' : ' In Scout panchina: Rosa e partite → Importa file.'}</small></div>`;
+      <div class="btnRow"><button class="btn small" type="button" id="mu_exp">Piano per lo scout touch (.json)</button><small class="hint">Per ogni loro rotazione: su chi battere, chi attacca e le chiamate di muro del foglio; partenza dall’allineamento scelto (${sel.srvStart} se battiamo, ${sel.recStart} se riceviamo). ${IN_APP ? ' Su questo dispositivo lo scout lo trova già in Rosa e partite → Piano avversario.' : ' In Scout panchina: Rosa e partite → Importa file.'}</small></div>      </div></div>`;
     publishPlan(sh);
   }
   // the two starts of an alignment, with both sixes on court (their back row on top, net, ours below)
@@ -5201,6 +5225,11 @@ if (typeof module !== 'undefined') module.exports = SHEET;
     window.addEventListener('pointermove', defMove);
     window.addEventListener('pointerup', defUp);
     $('#defReset').addEventListener('click', defReset);
+    $('#muBtn').addEventListener('click', openMatchup);
+    $('#muClose').addEventListener('click', closeMatchup);
+    $('#muOv').addEventListener('click', e => { if (e.target.id === 'muOv') closeMatchup(); });
+    $('#muOv').addEventListener('input', e => { if (e.target.id === 'muSheet') { openSheet(e.target.value); renderMatchup(); } else onInput(e); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#muOv').hidden && $('#lgOv').hidden) closeMatchup(); });
     $('#lgBtn').addEventListener('click', openLeague);
     $('#lgClose').addEventListener('click', closeLeague);
     $('#lgOv').addEventListener('click', e => { if (e.target.id === 'lgOv') closeLeague(); else onLeagueClick(e); });
