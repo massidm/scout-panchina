@@ -291,10 +291,11 @@ input.needs { border-color: var(--warn) !important; }
   .lgPl td:nth-child(2) { text-align: left; white-space: nowrap; }
   .ptrs { display: flex; flex-wrap: wrap; gap: 14px; text-align: left; padding: 4px 0; } .ptr { display: flex; flex-direction: column; gap: 2px; } .ptr .spark { width: 140px; height: 30px; margin: 0; } .ptr small { color: var(--muted); }
   a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.toScout { display: inline-flex; align-items: center; gap: 6px; background: #3E7D14; color: #fff !important; text-decoration: none; font-weight: 800; font-size: 16px; letter-spacing: .04em; padding: 10px 16px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.25); } .toScout:active { transform: translateY(1px); } @media (max-width: 480px) { .toScout { flex-basis: 100%; justify-content: center; } }
 </style>
 
 <header class="bar">
-  <a class="btn small ghost" href="../" id="toScout" title="Torna allo scout da panchina">← Scout</a>
+  <a class="toScout" href="../" id="toScout" title="Torna allo scout da panchina"><span aria-hidden="true">◀</span> SCOUT</a>
   <div class="brand"><i aria-hidden="true"></i>Foglio gara <small style="font-weight:500;opacity:.55;font-size:11px;margin-left:4px">v73</small></div>
   <select id="sheetSel" aria-label="Apri un foglio"></select>
   <button class="btn small ghost" id="newSheet" type="button">Nuovo</button>
