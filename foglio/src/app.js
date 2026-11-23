@@ -1535,6 +1535,14 @@
   }
   const muName = (sh, n, ours) => { if (!n) return '—'; if (ours) { const p = state.lgCfg?.us?.roster?.[n]; return `${n}-${(p?.surname || '').toUpperCase()}`; } const p = SHEET.player(sh, n); return `${n}-${(p.surname || '').toUpperCase()}`; };
   const MU_RULES = [['blk', 'a muro su'], ['noblk', 'NON a muro su'], ['rec', 'riceve in zona … sulla battuta di'], ['norec', 'NON riceve in zona … sulla battuta di']];
+  // the matchup is its own module (like Campionato): a full screen over the editor, on the sheet chosen at the top
+  function openMatchup() {
+    const sel = $('#muSheet');
+    const list = [...state.sheets].sort((a, b) => (b.updated || 0) - (a.updated || 0));
+    sel.innerHTML = list.map(s => `<option value="${s.id}"${s.id === state.sheet?.id ? ' selected' : ''}>${esc(s.meta?.opp || 'Nuovo foglio')}${s.meta?.date ? ' · ' + esc(s.meta.date.split('-').reverse().join('.')) : ''}</option>`).join('');
+    $('#muOv').hidden = false; renderMatchup(); $('#muClose').focus();
+  }
+  function closeMatchup() { $('#muOv').hidden = true; }
   function renderMatchup() {
     const sh = state.sheet, el = $('#secMu'); if (!el || !sh) return;
     if (!sh.stats) { el.innerHTML = '<p class="hint">Il matchup compare dopo aver caricato gli scout dell’avversario.</p>'; return; }
@@ -1551,7 +1559,13 @@
     const best = L[0], sel = L.find(x => x.c === mu.pick) || best;
     const ruleTxt = (ru) => `${muName(sh, ru.x, true)} ${ru.t === 'blk' ? 'a muro su' : ru.t === 'noblk' ? 'NON a muro su' : ru.t === 'rec' ? `riceve in ${ru.z} sulla battuta di` : `NON riceve in ${ru.z} sulla battuta di`} ${muName(sh, ru.y)}`;
     const pct = f => Math.round(100 * f) + '%';
-    el.innerHTML = `
+    el.innerHTML = `<div class="muLayout">
+      <div class="muCol muVis">
+      ${muStarts(sh, R, sel)}
+      ${muGridHtml(sh, R, sel)}
+      ${muStepPanel(sh, R, sel)}
+      </div>
+      <div class="muCol muCtl">
       <p class="hint">Le due squadre restano allineate allo stesso modo per tutto il set: gli allineamenti possibili sono 6. Per ognuno conto quanto rispetta le tue richieste, i set vinti stimati e tre indicatori dagli scout (relativi tra i 6 allineamenti, 0-100). Il migliore diventa la partenza in battuta e in ricezione, data la loro partenza probabile.</p>
       <div class="muGrid">
         <div><b>Noi · Garlasco</b> <small class="hint">tagliando dal palleggiatore; di partenza la formazione più usata nelle nostre partite${mu.oursSet ? ' · <button class="link" type="button" id="mu_ours_reset">Torna alla più usata</button>' : ''}</small>${six('o', mu.ours, mu.ourL)}</div>
@@ -1576,11 +1590,8 @@
         ${L.map((x, i) => `<tr class="${x === sel ? 'us' : ''}" data-mupick="${x.c}"><td>${i === 0 ? '★' : ''}</td><td><b>${x.srvStart}</b></td><td><b>${x.recStart}</b></td><td>${x.rules.length ? pct(x.rf / x.rules.length) : '—'}</td><td>${x.setSrv != null ? `${pct(x.setSrv)} · ${pct(x.setRec)}` : '—'}</td><td>${x.srvN}</td><td>${x.recN}</td><td>${x.blkN}</td><td><b>${x.ind}</b></td></tr>`).join('')}
       </tbody></table></div>
       <p class="hint">★ = suggerito: prima le richieste, poi i set vinti stimati (sotto i 2 punti di differenza contano come pari), poi l’indice. Set vinti stimati: scambio per scambio, il nostro cambio palla (o break point) in quella rotazione contro il loro break point (o cambio palla) in quella loro, nelle partite del girone, con le rotazioni con pochi scambi avvicinate alla media della squadra. È una stima del modello su campioni piccoli, non una previsione: serve a confrontare le partenze. Tocca una riga per vederla sotto.</p>
-      ${muStarts(sh, R, sel)}
-      ${muGridHtml(sh, R, sel)}
-      ${muStepPanel(sh, R, sel)}
       <details class="muMore"><summary>Tabella rotazione per rotazione</summary>${muDetail(sh, R, sel)}</details>
-      <div class="btnRow"><button class="btn small" type="button" id="mu_exp">Piano per lo scout touch (.json)</button><small class="hint">Per ogni loro rotazione: su chi battere, chi attacca e le chiamate di muro del foglio; partenza dall’allineamento scelto (${sel.srvStart} se battiamo, ${sel.recStart} se riceviamo). ${IN_APP ? ' Su questo dispositivo lo scout lo trova già in Rosa e partite → Piano avversario.' : ' In Scout panchina: Rosa e partite → Importa file.'}</small></div>`;
+      <div class="btnRow"><button class="btn small" type="button" id="mu_exp">Piano per lo scout touch (.json)</button><small class="hint">Per ogni loro rotazione: su chi battere, chi attacca e le chiamate di muro del foglio; partenza dall’allineamento scelto (${sel.srvStart} se battiamo, ${sel.recStart} se riceviamo). ${IN_APP ? ' Su questo dispositivo lo scout lo trova già in Rosa e partite → Piano avversario.' : ' In Scout panchina: Rosa e partite → Importa file.'}</small></div>      </div></div>`;
     publishPlan(sh);
   }
   // the two starts of an alignment, with both sixes on court (their back row on top, net, ours below)
@@ -2436,6 +2447,11 @@
     window.addEventListener('pointermove', defMove);
     window.addEventListener('pointerup', defUp);
     $('#defReset').addEventListener('click', defReset);
+    $('#muBtn').addEventListener('click', openMatchup);
+    $('#muClose').addEventListener('click', closeMatchup);
+    $('#muOv').addEventListener('click', e => { if (e.target.id === 'muOv') closeMatchup(); });
+    $('#muOv').addEventListener('input', e => { if (e.target.id === 'muSheet') { openSheet(e.target.value); renderMatchup(); } else onInput(e); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#muOv').hidden && $('#lgOv').hidden) closeMatchup(); });
     $('#lgBtn').addEventListener('click', openLeague);
     $('#lgClose').addEventListener('click', closeLeague);
     $('#lgOv').addEventListener('click', e => { if (e.target.id === 'lgOv') closeLeague(); else onLeagueClick(e); });
