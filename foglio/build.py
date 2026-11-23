@@ -25,7 +25,12 @@ else:
     pre = pre.replace('</head>', head + '</head>', 1)
     brand = '<div class="brand"><i aria-hidden="true"></i>Foglio gara'
     assert brand in pre
-    pre = pre.replace(brand, '<a class="btn small ghost" href="../" id="toScout" title="Torna allo scout da panchina">← Scout</a>\n  ' + brand, 1)
+    pre = pre.replace(brand, '<a class="toScout" href="../" id="toScout" title="Torna allo scout da panchina"><span aria-hidden="true">◀</span> SCOUT</a>\n  ' + brand, 1)
+    # the way back to the bench scout: big, filled, always in the sticky bar
+    css = ('.toScout { display: inline-flex; align-items: center; gap: 6px; background: #3E7D14; color: #fff !important; text-decoration: none;'
+           ' font-weight: 800; font-size: 16px; letter-spacing: .04em; padding: 10px 16px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.25); }'
+           ' .toScout:active { transform: translateY(1px); } @media (max-width: 480px) { .toScout { flex-basis: 100%; justify-content: center; } }')
+    i = pre.rindex('</style>'); pre = pre[:i] + css + '\n' + pre[i:]
     post = post.replace('</body>', "<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => {});</script>\n</body>", 1)
     html = pre + body + post
 open(out, 'w', encoding='utf-8').write(html)
